@@ -1,0 +1,173 @@
+//@author Template from Saitonashi, modified by VeraSplatoon
+
+//Controler pins: 6(HOME), 9(A), 10(X), 
+//LED pin: 4 (optional)
+//Color Sensor pin: A4(SDA), A5(SCL)
+
+#include <Wire.h>
+#include "Adafruit_TCS34725.h"
+#include <LiquidCrystal.h>
+#include <EEPROM.h>
+
+int pos;
+int HOME = 6;
+int A = 9;
+int X = 10;
+
+/* Connect LED    to analog 0 (optional)
+   Connect SCL    to analog 5
+   Connect SDA    to analog 4
+   Connect VDD    to 5V DC
+   Connect GROUND to common ground */
+Adafruit_TCS34725 Color_Sensor = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
+uint16_t red, green, blue, c;   // colorTemp, lux;
+
+//LCD
+const int rs = 12, en = 13, d4 = 7, d5 = 5, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+//EEPROM
+uint32_t resets;
+int eeAddress = 0;
+
+bool shiny = false;
+
+//---------------------------------------------------------------------
+
+//PRESS HOME BUTTON
+void press_Home_button() {
+  digitalWrite(HOME, HIGH);    //send signal to home button
+  delay(50);
+  digitalWrite(HOME, LOW);     //stop sending signal to home button
+  delay(500);
+}
+
+//PRESS A BUTTON
+void press_A_button() {
+  digitalWrite(A, HIGH);    //send signal to A button
+  delay(50);
+  digitalWrite(A, LOW);     //stop sending signal to A button
+  delay(500);
+}
+
+//PRESS X BUTTON
+void press_X_button() {
+  digitalWrite(X, HIGH);    //send signal to X button
+  delay(50);
+  digitalWrite(X, LOW);     //stop sending signal to X button
+  delay(500);
+}
+
+//---------------------------------------------------------------------
+void setup() {
+  Serial.begin(9600);
+
+  //Init LCD
+  lcd.begin(16,2);  //(col,row)
+  lcd.print("Shiny Bot V2.0");
+  lcd.setCursor(0,1);
+  //lcd.print("Poke bot 2.0");
+  
+  //Init LED
+  pinMode(HOME, OUTPUT);
+  pinMode(A, OUTPUT);
+  pinMode(X, OUTPUT);
+  pinMode(4, OUTPUT);
+  pinMode(A0, OUTPUT);
+  digitalWrite(4, HIGH);
+
+   lcd.setCursor(0,1);
+  lcd.print("                ");
+  lcd.setCursor(0,1);
+
+
+  //Check color sensor connection
+  if (Color_Sensor.begin()) {
+    Serial.println("Found sensor");
+    lcd.print("Found sensor");
+  } else {
+    Serial.println("No TCS34725 found ... check your connections");
+    lcd.print("No TCS34725 found");
+    while (1);
+  }
+
+ //Read data from EEPROM
+  EEPROM.get(eeAddress, resets);
+
+  digitalWrite(A0, HIGH);
+  digitalWrite(4, LOW);
+}
+
+void loop() {
+  while (!shiny) {
+    //Show reset count
+    Serial.print("Reset ");
+    Serial.print(resets);
+    Serial.print(" ; ");
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Reset:");
+    lcd.setCursor(6,0);
+    lcd.print(resets);
+
+    //Lauch game
+    press_A_button();       //delay 500
+    delay(1000);
+    press_A_button();       //delay 500
+
+    //Wait for load game
+    delay(25200);
+    press_A_button();       //delay 500
+    delay(2900);
+    press_A_button();       //delay 500
+    delay(13000);
+
+    //Interact with Pokemon
+    press_A_button();       //delay 500
+    delay(550);
+    press_A_button();       //delay 500
+    delay(17610);
+
+    //Check Dialga color
+    Color_Sensor.getRawData(&red, &green, &blue, &c);
+    Serial.print("R: ");
+    Serial.print(red, DEC);
+    Serial.print(" G: ");
+    Serial.print(green, DEC);
+    Serial.print(" B: ");
+    Serial.print(blue, DEC);
+    Serial.print(" ; ");
+    lcd.setCursor(0,1);
+    lcd.print("R:");
+    lcd.setCursor(2,1);
+    lcd.print(red, DEC);
+    lcd.setCursor(6,1);
+
+    //If Pokemon color is different, is shiny
+    if (red < 350) {
+      shiny = true;
+      Serial.println("SHINY!!!");
+      lcd.print("SHINY!!!");
+      digitalWrite(4, HIGH);    //Light up LED to communicate shiny pokemon shows up
+      continue;
+    } else {
+      Serial.println("Non Shiny :<");
+      lcd.print("Non Shiny");
+    }
+
+    //Exit game
+    if (!shiny) {   //condition for a security against resetting the game if shiny shows up
+      press_Home_button();  //delay 520
+      delay(500);
+      press_X_button();     //delay 500
+      delay(500);
+      press_A_button();     //delay 500
+      delay(500);
+      resets++;             //sumary delay 58920ms
+                            //61 resets per hour
+                            //sumary delay after optymalization 54920ms (4 sec diffferent)
+                            //65 resets per hour
+    EEPROM.put(eeAddress, resets);                        
+    }
+  }
+}
